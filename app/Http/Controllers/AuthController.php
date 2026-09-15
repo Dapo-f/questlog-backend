@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Mail;
 use App\Mail\VerificationCodeMail;
 use App\Mail\PasswordResetMail;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\RateLimiter;
 
 class AuthController extends Controller
 {
@@ -132,35 +133,38 @@ class AuthController extends Controller
 
     public function login(Request $request)
     {
-        // Step 1: Validate
         $request->validate([
             'identifier' => 'required|string',
             'password' => 'required|string',
         ]);
 
-        // Step 2: Find the user
+        $throttleKey = strtolower($request->identifier) . '|' . $request->ip();
+
+        if (RateLimiter::tooManyAttempts($throttleKey, 3)) {
+            $seconds = RateLimiter::availableIn($throttleKey);
+            $minutes = ceil($seconds / 60);
+            return response()->json([
+                'message' => "Too many login attempts. Please try again in {$minutes} minute(s).",
+            ], 429);
+        }
+
         $user = User::where('email', $request->identifier)
             ->orWhere('username', $request->identifier)
             ->first();
 
-        if (!$user) {
-            return response()->json(['message' => 'User not found.'], 404);
-        }
-
-        // Step 3: Verify the password
-        if (!Hash::check($request->password, $user->password)) {
+        if (!$user || !Hash::check($request->password, $user->password)) {
+            RateLimiter::hit($throttleKey, 300);
             return response()->json(['message' => 'Invalid credentials.'], 401);
         }
 
-        // Step 4: Check if the user is verified
         if (!$user->is_verified) {
             return response()->json(['message' => 'Account is not verified. Please verify your email.'], 403);
         }
 
-        // Step 5: Create a token
+        RateLimiter::clear($throttleKey);
+
         $token = $user->createToken('auth_token')->plainTextToken;
 
-        // Step 6: Return the token
         return response()->json([
             'message' => 'Login successful.',
             'token' => $token,
