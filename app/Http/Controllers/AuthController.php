@@ -212,6 +212,44 @@ class AuthController extends Controller
         ], 200);
     }
 
+    public function forgotPasswordResendCode(Request $request)
+    {
+        // Step 1: Validate
+        $request->validate([
+            'email' => 'required|email',
+        ]);
+
+        // Step 2: Find the user
+        $user = User::where('email', $request->email)->first();
+
+        if (!$user) {
+            return response()->json(['message' => 'User not found.'], 404);
+        }
+
+        if (!$user->is_verified) {
+            return response()->json(['message' => 'Account is not yet verified.'], 400);
+        }
+
+        // Step 3: Generate a new 6 digit code and update the verification row
+        $token = str_pad(rand(0, 999999), 6, '0', STR_PAD_LEFT);
+
+        PasswordReset::updateOrCreate(
+            ['email' => $user->email],
+            [
+                'token' => $token,
+                'expires_at' => now()->addMinutes(10)
+            ]
+        );
+
+        // Step 4: Send the email
+        Mail::to($user->email)->send(new PasswordResetMail($token));
+
+        // Step 5: Return a response
+        return response()->json([
+            'message' => 'New password reset code sent.',
+        ], 200);
+    }
+
     public function resetPassword(Request $request)
     {
         // Step 1: Validate

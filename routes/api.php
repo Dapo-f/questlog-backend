@@ -12,6 +12,7 @@ use App\Http\Controllers\UserController;
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/verify-email', [AuthController::class, 'verifyEmail']);
 Route::post('/resend-code', [AuthController::class, 'resendCode']);
+Route::post('/forgot-password-resend-code', [AuthController::class, 'forgotPasswordResendCode']);
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
 Route::post('/reset-password', [AuthController::class, 'resetPassword']);
