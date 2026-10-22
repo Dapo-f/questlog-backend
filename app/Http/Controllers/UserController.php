@@ -17,16 +17,24 @@ class UserController extends Controller
     }
 
     public function search(Request $request)
-    {
-        $query = $request->query('q', '');
+{
+    $query = $request->query('q', '');
+    $page = (int) $request->query('page', 1);
+    $perPage = 10;
 
-        $users = User::where('username', 'like', "%{$query}%")
-            ->select('id', 'username', 'profile_picture', 'created_at')
-            ->take(40)
-            ->get();
+    $users = User::where('username', 'like', "%{$query}%")
+        ->select('id', 'username', 'profile_picture', 'created_at')
+        ->skip(($page - 1) * $perPage)
+        ->take($perPage)
+        ->get();
 
-        return response()->json($users, 200);
-    }
+    $total = User::where('username', 'like', "%{$query}%")->count();
+
+    return response()->json([
+        'users' => $users,
+        'hasMore' => ($page * $perPage) < $total,
+    ], 200);
+}
 
     public function updateUsername(Request $request)
     {
