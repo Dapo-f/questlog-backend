@@ -5,10 +5,17 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Cloudinary\Cloudinary;
 
 class UserController extends Controller
 {
     //
+
+    private function cloudinary(): Cloudinary
+    {
+        return new Cloudinary(config('services.cloudinary.url'));
+    }
+
     public function show($user)
     {
         $user = User::where("username", $user)->select('id', 'username', 'profile_picture', 'created_at')->firstOrFail();
@@ -17,24 +24,24 @@ class UserController extends Controller
     }
 
     public function search(Request $request)
-{
-    $query = $request->query('q', '');
-    $page = (int) $request->query('page', 1);
-    $perPage = 10;
+    {
+        $query = $request->query('q', '');
+        $page = (int) $request->query('page', 1);
+        $perPage = 10;
 
-    $users = User::where('username', 'like', "%{$query}%")
-        ->select('id', 'username', 'profile_picture', 'created_at')
-        ->skip(($page - 1) * $perPage)
-        ->take($perPage)
-        ->get();
+        $users = User::where('username', 'like', "%{$query}%")
+            ->select('id', 'username', 'profile_picture', 'created_at')
+            ->skip(($page - 1) * $perPage)
+            ->take($perPage)
+            ->get();
 
-    $total = User::where('username', 'like', "%{$query}%")->count();
+        $total = User::where('username', 'like', "%{$query}%")->count();
 
-    return response()->json([
-        'users' => $users,
-        'hasMore' => ($page * $perPage) < $total,
-    ], 200);
-}
+        return response()->json([
+            'users' => $users,
+            'hasMore' => ($page * $perPage) < $total,
+        ], 200);
+    }
 
     public function updateUsername(Request $request)
     {
@@ -57,12 +64,16 @@ class UserController extends Controller
 
         $user = $request->user();
 
-        if ($user->profile_picture) {
-            Storage::disk('public')->delete($user->profile_picture);
-        }
+        $result = $this->cloudinary()->uploadApi()->upload(
+            $request->file('profile_picture')->getRealPath(),
+            [
+                'public_id' => 'questlog/profile_pictures/user_' . $user->id,
+                'overwrite' => true,
+                'invalidate' => true,
+            ]
+        );
 
-        $path = $request->file('profile_picture')->store('profile_pictures', 'public');
-        $user->profile_picture = $path;
+        $user->profile_picture = $result['secure_url'];
         $user->save();
 
         return response()->json($user, 200);
@@ -73,7 +84,10 @@ class UserController extends Controller
         $user = $request->user();
 
         if ($user->profile_picture) {
-            Storage::disk('public')->delete($user->profile_picture);
+            $this->cloudinary()->uploadApi()->destroy(
+                'questlog/profile_pictures/user_' . $user->id,
+                ['invalidate' => true]
+            );
         }
 
         $user->profile_picture = null;
