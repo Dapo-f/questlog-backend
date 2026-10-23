@@ -43,4 +43,4 @@ RUN echo "Listen 10000" > /etc/apache2/ports.conf && sed -i 's/:80>/:10000>/' /e
 
 EXPOSE 10000
 
-CMD ["sh", "-c", "php artisan config:clear && apache2-foreground"]
+CMD ["sh", "-c", "php artisan config:clear && php artisan storage:link --force && apache2-foreground"]
