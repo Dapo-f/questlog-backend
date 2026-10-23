@@ -39,6 +39,8 @@ RUN composer install \
 
 RUN chown -R www-data:www-data storage bootstrap/cache
 
-EXPOSE 80
+RUN echo "Listen 10000" > /etc/apache2/ports.conf && sed -i 's/:80>/:10000>/' /etc/apache2/sites-available/000-default.conf
 
-CMD ["sh", "-c", "php artisan config:clear && php artisan migrate --force && apache2-foreground"]
+EXPOSE 10000
+
+CMD ["sh", "-c", "php artisan config:clear && apache2-foreground"]
